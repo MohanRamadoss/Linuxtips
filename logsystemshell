@@ -1,0 +1,185 @@
+cat >> /etc/profile.d/history.sh <<EOF
+# Administrator specific aliases and functions for system security
+export HISTTIMEFORMAT="%Y-%m-%d %H:%M:%S "
+export TIME_STYLE=long-iso
+EOF
+
+
+
+function Install_And_Configure {
+    echo -e "\e[1;33mInstalling and configuring rsyslog, please wait for a while...\e[0m"
+    rpm -qa | grep rsyslog > /dev/null
+    if [[ $? == 1 ]]; then
+        yum install rsyslog -y > /dev/null
+    fi
+
+    #Configure rsyslog to send logs
+    RLOG_CONF=/etc/rsyslog.conf
+    if [[ -f $RLOG_CONF.bak ]]; then
+        rm -f RLOG_CONF
+        mv $RLOG_CONF.bak $RLOG_CONF
+    else
+        cp $RLOG_CONF $RLOG_CONF.bak
+    fi
+    echo -n -e "\e[1;35mEnter the remote server's ip: \e[0m"
+    read IP
+    echo "*.* @$IP:514" >> $RLOG_CONF
+
+    #Configure the remote server to record all command.
+    
+    BASH_CONF=/etc/bashrc
+    if [[ -f $BASH_CONF.bak ]]; then
+        rm -f $BASH_CONF
+        mv $BASH_CONF.bak $BASH_CONF
+    else
+        cp $BASH_CONF $BASH_CONF.bak
+    fi
+    cat >> $BASH_CONF<<EOF
+export PROMPT_COMMAND='{ msg=$(history 1 | { read x y; echo $y; });logger "[euid=$(whoami)]":$(who am i):[`pwd`]"$msg"; }'
+EOF
+    source /etc/bashrc
+    source /etc/bashrc
+
+    systemctl restart rsyslog > /dev/null
+	systemctl enable rsyslog.service > /dev/null
+}
+
+Install_And_Configure
+
+/bin/echo '' >> /etc/bashrc
+/bin/echo '# grep color' >> /etc/bashrc
+/bin/echo "alias grep='grep --color=auto'" >> /etc/bashrc
+/bin/echo "alias egrep='grep -E --color=auto'" >> /etc/bashrc
+
+/bin/echo "alias cp='cp -i'" >> /etc/bashrc
+/bin/echo "alias l.='ls -d .* --color=auto'" >> /etc/bashrc
+/bin/echo "alias ll='ls -l --color=auto'" >> /etc/bashrc
+/bin/echo "alias ls='ls --color=auto'" >> /etc/bashrc
+/bin/echo "alias mv='mv -i'" >> /etc/bashrc
+/bin/echo "alias rm='rm -i'" >> /etc/bashrc
+
+/bin/echo '' >> /etc/bashrc
+/bin/echo 'export HISTTIMEFORMAT="%F %T $(whoami) "' >> /etc/bashrc
+/bin/echo "export PROMPT_COMMAND='{ msg=\$(history 1 | { read x y; echo \$y; });logger \"[euid=\$(whoami)]\":\$(who am i):[\`pwd\`]\"\$msg\"; }'" >> /etc/bashrc 
+# export PROMPT_COMMAND='{ msg=$(history 1 | { read x y; echo $y; });logger "[euid=$(whoami)]":$(who am i):[`pwd`]"$msg"; }'  
+source /etc/bashrc
+
+# no.9 limits.conf
+/bin/cp /etc/security/limits.conf /etc/security/limits.conf.ori
+/bin/echo "* soft nofile 131070" >> /etc/security/limits.conf
+/bin/echo "* hard nofile 131070" >> /etc/security/limits.conf
+
+# no.10 kernel optimize
+/bin/cp /etc/sysctl.conf /etc/sysctl.conf.ori
+/bin/cat >> /etc/sysctl.conf << EOF
+### optimization by zhangliang $(date +%F)
+net.ipv4.tcp_syn_retries = 1
+net.ipv4.tcp_synack_retries = 1
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_keepalive_intvl =15
+net.ipv4.tcp_retries2 = 5
+net.ipv4.tcp_fin_timeout = 2
+net.ipv4.tcp_max_tw_buckets = 36000
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_max_orphans = 32768
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_max_syn_backlog = 16384
+net.ipv4.tcp_wmem = 8192 131072 16777216
+net.ipv4.tcp_rmem = 32768 131072 16777216
+net.ipv4.tcp_mem = 786432 1048576 1572864
+net.ipv4.ip_local_port_range = 1024 65000
+net.core.somaxconn = 16384
+net.core.netdev_max_backlog = 16384
+EOF
+
+/sbin/sysctl -p 
+
+# no.11 timing clear system mail
+/bin/mkdir /server/scripts/ -p	
+/bin/echo "# timing clear system mail" >>/server/scripts/del_mail_file.sh
+/bin/echo '/bin/find /var/spool/postfix/maildrop/ -type f | xargs -I{} /bin/rm -f {}' >> /server/scripts/del_mail_file.sh
+/bin/echo "" >> /var/spool/cron/root
+/bin/echo '# delete mail file by zhangliang at $(date +%F)' >> /var/spool/cron/root	
+/bin/echo '00 00 * * 6 /bin/sh /server/scripts/del_mail_file.sh >/dev/null 2>&1' >> /var/spool/cron/root	
+
+# no.12 hide system version info
+/bin/cp /etc/issue /etc/issue.ori
+/bin/cp /etc/issue.net /etc/issue.net.ori
+> /etc/issue
+> /etc/issue.net
+
+/bin/echo "" >> /etc/motd
+/bin/echo 'Welcome You Login' >> /etc/motd
+/bin/echo "" >> /etc/motd
+
+# no.13 SSH optimize
+/bin/cp /etc/ssh/sshd_config /etc/ssh/sshd_config.ori
+/bin/cat >> /etc/ssh/sshd_config << EOF
+##### by zhangliang # $(date +%F)##	
+# Port 52113
+PermitRootLogin no
+PermitEmptyPasswords no
+UseDNS no
+GSSAPIAuthentication no
+##### by zhangliang # $(date +%F)##
+EOF
+
+systemctl restart sshd.service
+
+# no.14 install necessary software
+/usr/bin/yum install -y bash-completion # systemctl tab
+/usr/bin/yum install -y pcre pcre-devel
+/usr/bin/yum install -y openssl openssl-devel 
+/usr/bin/yum install -y nfs-utils rpcbind
+/usr/bin/yum install -y lrzsz sysstat nmap tree telnet dos2unix nc vim
+
+
+
+
+
+
+#export PROMPT_COMMAND='{ msg=$(history 1 | { read x y; echo $y; });logger "[euid=$(whoami)]":$(who am i):[`pwd`]"$msg"; }'
+export PROMPT_COMMAND='{ cmd=$(history 1 | { read a b; echo "$b"; });msg=$(who am i |awk "{print \$2,\$NF}");logger -i -p local1.notice "$msg $USER $PWD $cmd"; }'
+
+
+declare -rx HISTCONTROL=""                                  #does not ignore spaces or duplicates
+declare -rx HISTIGNORE=""                                   #does not ignore patterns
+declare -rx AUDIT_LOGINUSER="$(who -mu | awk '{print $1}')"
+declare -rx AUDIT_LOGINPID="$(who -mu | awk '{print $6}')"
+declare -rx AUDIT_USER="$USER"                              #defined by pam during su/sudo
+declare -rx AUDIT_PID="$$"
+declare -rx AUDIT_TTY="$(who -mu | awk '{print $2}')"
+declare -rx AUDIT_SSH="$([ -n "$SSH_CONNECTION" ] && echo "$SSH_CONNECTION" | awk '{print $1":"$2"->"$3":"$4}')"
+declare -rx AUDIT_STR="[audit $AUDIT_LOGINUSER/$AUDIT_LOGINPID as $AUDIT_USER/$AUDIT_PID on $AUDIT_TTY/$AUDIT_SSH]"
+set +o functrace                                            #disable trap DEBUG inherited in functions, command substitutions or subshells, normally the default setting already
+shopt -s extglob                                            #enable extended pattern matching operators
+function audit_DEBUG() {
+  if [ "$BASH_COMMAND" != "$PROMPT_COMMAND" ]               #avoid logging unexecuted commands after 'ctrl-c or 'empty+enter'
+  then
+    local AUDIT_CMD="$(history 1)"                          #current history command
+    if ! logger -p user.info -t "$AUDIT_STR $PWD" "${AUDIT_CMD##*( )?(+([0-9])[^0-9])*( )}"
+    then
+      echo error "$AUDIT_STR $PWD" "${AUDIT_CMD##*( )?(+([0-9])[^0-9])*( )}"
+    fi
+  fi
+}
+function audit_EXIT() {
+  local AUDIT_STATUS="$?"
+  logger -p user.info -t "$AUDIT_STR" "#=== bash session ended. ==="
+  exit "$AUDIT_STATUS"
+}
+declare -fr +t audit_DEBUG
+declare -fr +t audit_EXIT
+logger -p user.info -t "$AUDIT_STR" "#=== New bash session started. ===" #audit the session openning
+#when a bash command is executed it launches first the audit_DEBUG(),
+#then the trap DEBUG is disabled to avoid a useless rerun of audit_DEBUG() during the execution of pipes-commands;
+#at the end, when the prompt is displayed, re-enable the trap DEBUG
+declare -rx PROMPT_COMMAND="trap 'audit_DEBUG; trap DEBUG' DEBUG"
+declare -rx BASH_COMMAND                                    #current command executed by user or a trap
+declare -rx SHELLOPT                                        #shell options, like functrace
+trap audit_EXIT EXIT  
+
+
+
