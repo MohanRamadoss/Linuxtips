@@ -183,3 +183,80 @@ trap audit_EXIT EXIT
 
 
 
+
+
+By adding the following entry in /etc/bashrc, we can log the commands executed by all the users on a Linux machine. 
+This would be certainly helpful for tracking commands on Critical servers.
+
+PROMPT_COMMAND='history -a >(logger -t "$USER[$PWD] $SSH_CONNECTION")'
+
+After you added the above entry at the end of /etc/bashrc file, execute the command 'source /etc/bashrc' or logout and login back to your session. Now the commands executed by all the users will be logged in /var/log/messages.
+
+Lets say you want to capture the command execution in a different file called "/var/log/usercommands".
+
+local7.notice                           /var/log/cmd.log
+This will also log all the commands in the /var/log/messages file. To avoid these commands to be logged in into the /var/log/messages file, add below line in /etc/syslog.conf (for CentOS/RHEL 4/5) or /etc/rsyslog.conf (for CentOS/RHEL 6/7):
+
+*.info;mail.none;authpriv.none;cron.none;local7.!notice                     /var/log/messages
+
+
+For CentOS/RHEL 4/5
+# service syslog restart
+For CentOS/RHEL 6
+# service rsyslog restart
+For CentOS/RHEL 7
+# systemctl restart rsyslog
+
+
+
+
+
+
+
+How to Log all Bash History Commands to syslog (/var/log/messages) in CentOS/RHEL
+By admin
+
+
+ 
+The Ask
+The user wants to see the list of commands used in the syslog messages. This way the user can audit user activities written in bash_history.
+
+The Solution
+1. To log bash history to a syslog server, you can use the trap feature provided by Bash. Append the following lines into either the per-user or system-wide bash profile; ~/.bash_profile and /etc/profile file.
+
+PORT=`who am i | awk '{ print $5 }' | sed 's/(//g' | sed 's/)//g'`
+logger -p local7.notice -t "bash $LOGNAME $$" User $LOGNAME logged from $PORT
+function history_to_syslog
+{
+declare cmd
+declare p_dir
+declare LOG_NAME
+cmd=$(history 1)
+cmd=$(echo $cmd |awk '{print substr($0,length($1)+2)}')
+p_dir=$(pwd)
+LOG_NAME=$(echo $LOGNAME)
+if [ "$cmd" != "$old_command" ]; then
+logger -p local7.notice -- SESSION = $$, from_remote_host = $PORT,  USER = $LOG_NAME,  PWD = $p_dir, CMD = "${cmd}"
+fi
+old_command=$cmd
+}
+trap history_to_syslog DEBUG || EXIT
+Note: This resolution spawns new process at each command logged, so it might not be a best solution if your system is in a heavy load.
+2. To save this log messages into a particular log file, add below line in /etc/syslog.conf (for CentOS/RHEL 4/5) or /etc/rsyslog.conf (for CentOS/RHEL 6/7):
+
+
+ 
+local7.notice                           /var/log/cmd.log
+This will also log all the commands in the /var/log/messages file. To avoid these commands to be logged in into the /var/log/messages file, add below line in /etc/syslog.conf (for CentOS/RHEL 4/5) or /etc/rsyslog.conf (for CentOS/RHEL 6/7):
+
+*.info;mail.none;authpriv.none;cron.none;local7.!notice                     /var/log/messages
+This will not log the messages with priority notice or higher in /var/log/messages file.
+
+3. Run below command to apply this change:
+
+For CentOS/RHEL 4/5
+# service syslog restart
+For CentOS/RHEL 6
+# service rsyslog restart
+For CentOS/RHEL 7
+# systemctl restart rsyslog
