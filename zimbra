@@ -1,3 +1,8 @@
+iptables -L --line-numbers -n
+
+
+
+
 iptables -P INPUT DROP
 iptables -P OUTPUT ACCEPT
 iptables -A INPUT -i lo -j ACCEPT
