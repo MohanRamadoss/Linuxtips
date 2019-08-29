@@ -1,0 +1,69 @@
+iptables -P INPUT DROP
+iptables -P OUTPUT ACCEPT
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -s IP-Address-of-server/32 -j ACCEPT
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p icmp -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -p tcp --dport 25 -j ACCEPT
+iptables -A INPUT -p tcp --dport 110 -j ACCEPT
+iptables -A INPUT -p tcp --dport 143 -j ACCEPT
+iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -p tcp --dport 465 -j ACCEPT
+iptables -A INPUT -p tcp --dport 587 -j ACCEPT
+iptables -A INPUT -p tcp --dport 993 -j ACCEPT
+iptables -A INPUT -p tcp --dport 995 -j ACCEPT
+iptables -A INPUT -p tcp --dport 3443 -j ACCEPT
+iptables -A INPUT -p tcp --dport 5222 -j ACCEPT
+iptables -A INPUT -p tcp --dport 5223 -j ACCEPT
+iptables -A INPUT -p tcp --dport 9071 -j ACCEPT
+iptables -A INPUT -p tcp --dport 8443 -j ACCEPT
+iptables -A INPUT -p tcp --dport 7071 -j ACCEPT
+iptables -A INPUT -p tcp --sport 80 -j ACCEPT
+iptables -A INPUT -p tcp --sport 25 -j ACCEPT
+iptables -A INPUT -p tcp --sport 110 -j ACCEPT
+iptables -A INPUT -p tcp --sport 143 -j ACCEPT
+iptables -A INPUT -p tcp --sport 443 -j ACCEPT
+iptables -A INPUT -p tcp --sport 465 -j ACCEPT
+iptables -A INPUT -p tcp --sport 587 -j ACCEPT
+iptables -A INPUT -p tcp --sport 993 -j ACCEPT
+iptables -A INPUT -p tcp --sport 995 -j ACCEPT
+iptables -A INPUT -p tcp --sport 3443 -j ACCEPT
+iptables -A INPUT -p tcp --sport 5222 -j ACCEPT
+iptables -A INPUT -p tcp --sport 5223 -j ACCEPT
+iptables -A INPUT -p tcp --sport 9071 -j ACCEPT
+iptables -A INPUT -p tcp --sport 8443 -j ACCEPT
+iptables -A INPUT -p tcp --sport 7071 -j ACCEPT
+iptables -A INPUT -p udp --sport 53 -j ACCEPT
+
+
+
+
+
+
+
+
+
+###############################
+
+To block a SSH brute force attack, we just need to slow down the flow of requests. We can do this by rate-limiting requests to SSH with iptables.
+
+Essentially, we create a smaller pipe for new SSH sessions.  This slows brute force attacks to a point where they become ineffective.
+
+The iptables rules are relatively simple.
+
+	
+/usr/sbin/iptables -I INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent --set
+/usr/sbin/iptables -I INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent  --update --seconds 60 --hitcount 4 -j DROP
+
+This rule will block an IP if it attempts more than 3 connections per minute to SSH. Notice that the state is set to NEW. This means only new connections not established ones are impacted. Established connections are the result of a successful SSH authentication, so users who authenticate properly will not be blocked.
+
+If you need to see what’s being done, you may want to log these drops. You can do so by setting up a log rule and then using these rules instead.
+	
+/sbin/iptables -N LOGDROP
+/sbin/iptables -A LOGDROP -j LOG
+/sbin/iptables -A LOGDROP -j DROP
+iptables -I INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent --set
+iptables -I INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent  --update --sec
