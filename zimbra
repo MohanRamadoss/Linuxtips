@@ -67,3 +67,34 @@ If you need to see what’s being done, you may want to log these drops. You can
 /sbin/iptables -A LOGDROP -j DROP
 iptables -I INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent --set
 iptables -I INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent  --update --sec
+
+
+
+
+########################################
+
+
+You may use these rules (skip the first one, if you have set the basic rules):
+
+for tables in iptables ip6tables ; do
+    # Allow established inbound connections
+    $tables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+    # Maximum 6 new connections every 60 seconds
+    $tables -A INPUT -p tcp --dport 22 -m recent --update --seconds 60 --hitcount 6 --name SSH --rsource -j DROP
+    # Allow and record new connections
+    $tables -A INPUT -p tcp --dport 22 -m recent --set --name SSH --rsource -j ACCEPT
+    # Reject other connections; use only needed
+    $tables -A INPUT -j REJECT
+    $tables -A FORWARD -j REJECT
+done
+
+The first rule accepts ESTABLISHED connections. New SSH connections will hit the next 2 rules and be marked.
+
+If you are using firwalld, these 2 rules can be used for limiting the rate as for the 2nd and 3rd rules (not all):
+
+firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT_direct 0 -p tcp --dport 22 -m state --state NEW -m recent --set
+firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT_direct 1 -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 6 -j REJECT --reject-with tcp-reset
+firewall-cmd --reload
+
+
+
