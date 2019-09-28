@@ -53,3 +53,12 @@ if [ -n "${RHEL7}" ]; then
 else
   echo "No Rhel7 detected: ${RHEL7}"
 fi
+
+
+yum update -y 2> /dev/null
+       if [[ $? -eq 0 ]]
+       then
+        echo -e "Patching is completed successfully"
+       else
+        echo -e "ERROR:- YUM has some issues while patching"
+       fi
