@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [[ $UID -ne 0 ]]; then
+   echo "This script must be run as root or with 'sudo'" 
+   exit 1
+fi
+
+echo "Clearing yum cache"
+yum clean all
+
+cmd="/usr/bin/yum check-update"
+status=$?
+update="/usr/bin/yum update"
+
+$cmd
+status=$?
+
+if [ $status -eq 100 ]
+then 
+	echo "Updates are available. Running 'yum update'"
+	$update
+	exit 0	
+else
+	echo "No system updates are available"
+	exit 1
+  
+  osupdate ()
+{
+echo "--> Updating RHEL7 System"
+#touch /tmp/checkupdate.log
+#yum check-update | tee -a /tmp/checkupdate.log
+
+YUM_UPDATE_TEXT="$($(which yum) check-update 2>&1 | grep -v -e "^$" -e "kernel" -e "Obsoleting" -e "Excluding" -e "Finished" -e "plugins:" -e "mirror" -e "epel-source" -e "epel-debuginfo" -e "no version information" -e "base:" -e "epel:" -e "rpmforge" -e "remi" -e "extra:" -e "updates:" -e "extras" | awk '{print $1"\t -> "$2}' | column -t)"
+YUM_UPDATE_NO=$(echo -n "${YUM_UPDATE_TEXT}" | wc -l)
+if [[ "${YUM_UPDATE_NO}" -ge 1 ]]; then
+    echo "WARNING: ${YUM_UPDATE_NO} updates available."
+    echo "${YUM_UPDATE_TEXT}"
+    yum -y update | tee -a  /tmp/checkupdate.log
+    echo -e "System will Reboot!! " | tee -a /tmp/checkupdate.log
+    reboot | exit 1
+else
+    echo "OK: ${YUM_UPDATE_NO} updates available."
+    exit 0
+fi
+
+}
+
+
+RHEL7=`grep "release 7" /etc/redhat-release`
+if [ -n "${RHEL7}" ]; then
+  echo "RHEL7 detected: ${RHEL7}"
+  osupdate
+else
+  echo "No Rhel7 detected: ${RHEL7}"
+fi
