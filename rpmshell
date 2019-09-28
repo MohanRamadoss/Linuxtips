@@ -1,0 +1,33 @@
+yum list $pkg > /dev/null
+if [ $? -eq 0 ]
+then
+    echo "Installing $pkg"
+    yum -y install $pkg
+else
+    echo "$pkg not found or unknown error."
+fi
+
+
+clear
+echo "**** Checking Packages ****"
+yum clean all
+yum update
+array=(traceroute tree net-tools nmap bind-utils vnc-server vsftpd mariadb)
+for pkg in "${array[@]}"
+do
+pkg="$pkg"
+
+
+    # grep -ir $pkg /var/cache/yum/ > /dev/null
+    yum list $pkg > /dev/null
+    # yum search $pkg>/dev/null  
+    a=$?
+    echo "- $? - $a -"
+    if [ $a -eq 0 ]
+            then
+                    echo "* $pkg * installed or available to be installed"
+                    # yum install $pkg
+            else
+                    echo "* $pkg not found or unknown error."
+    fi
+done
