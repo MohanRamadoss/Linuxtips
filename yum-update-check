@@ -62,3 +62,47 @@ yum update -y 2> /dev/null
        else
         echo -e "ERROR:- YUM has some issues while patching"
        fi
+       
+       
+#!/bin/bash
+set -xe
+osupdate ()
+{
+echo "--> Updating RHEL7 System"
+
+YUM_UPDATE_TEXT="$($(which yum) check-update 2>&1 | grep -v -e "^$" -e "kernel" -e "Obsoleting" -e "Excluding" -e "Finished" -e "plugins:" -e "mirror" -e "epel-source" -e "epel-debuginfo" -e "no version information" -e "base:" -e "epel:" -e "rpmforge" -e "remi" -e "extra:" -e "updates:" -e "extras" | awk '{print $1"\t -> "$2}' | column -t)"
+YUM_UPDATE_NO=$(echo -n "${YUM_UPDATE_TEXT}" | wc -l)
+if [[ "${YUM_UPDATE_NO}" -ge 1 ]]; then
+    echo "WARNING: ${YUM_UPDATE_NO} updates available."
+    echo "${YUM_UPDATE_TEXT}"
+     #yum update -y  | tee -a  /tmp/checkupdate.log
+       if [[ $? -eq 0 ]]
+       then
+       echo -e "Patching is completed successfully" | tee -a /tmp/checkupdate.log
+       else
+        echo -e "ERROR:- YUM has some issues while patching" | tee -a /tmp/checkupdate.log
+       fi
+else
+    echo "OK: ${YUM_UPDATE_NO} updates available."
+    exit 0
+fi
+
+}
+
+kernel ()
+{
+if [ "`rpm -q kernel --queryformat '%{installtime} %{version}-%{release}.%{arch}\n' | sort -n -k1 | tail -1 | cut -d ' ' -f 2`" = "`uname -r`" ]; then
+echo "latest kernel already booted."
+else
+echo "new kernel. reboot required."
+fi
+}
+
+RHEL7=`grep "release 7" /etc/redhat-release`
+if [ -n "${RHEL7}" ]; then
+  echo "RHEL7 detected: ${RHEL7}"
+  osupdate
+  kernel
+else
+  echo "No Rhel7 detected: ${RHEL7}"
+fi
