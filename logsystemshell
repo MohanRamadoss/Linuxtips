@@ -260,3 +260,74 @@ For CentOS/RHEL 6
 # service rsyslog restart
 For CentOS/RHEL 7
 # systemctl restart rsyslog
+
+
+
+
+Append the following lines into either the per-user or system-wide bash profile; ~/.bash_profile and /etc/profile file.
+
+PORT=`who am i | awk '{ print $5 }' | sed 's/(//g' | sed 's/)//g'`
+logger -p local7.notice -t "bash $LOGNAME $$" User $LOGNAME logged from $PORT
+function history_to_syslog
+{
+declare cmd
+declare p_dir
+declare LOG_NAME
+cmd=$(history 1)
+cmd=$(echo $cmd |awk '{print substr($0,length($1)+2)}')
+p_dir=$(pwd)
+LOG_NAME=$(echo $LOGNAME)
+if [ "$cmd" != "$old_command" ]; then
+logger -p local7.notice -- SESSION = $$, from_remote_host = $PORT,  USER = $LOG_NAME,  PWD = $p_dir, CMD = "${cmd}"
+fi
+old_command=$cmd
+}
+trap history_to_syslog DEBUG || EXIT
+Note: This resolution spawns new process at each command logged, so it might not be a best solution if your system is in a heavy load.
+To save this log messages into a particular log file, add below line in /etc/syslog.conf (for RHEL4/5) or /etc/rsyslog.conf (for RHEL6):
+
+Raw
+local7.notice                           /var/log/cmd.log
+This will also log all the commands in the /var/log/messages file.
+To avoid these commands to be logged in into the /var/log/messages file, add below line in /etc/syslog.conf (for RHEL4/5) or /etc/rsyslog.conf (for RHEL6/7):
+Raw
+*.info;mail.none;authpriv.none;cron.none;local7.!notice                     /var/log/messages
+
+
+
+
+
+Record all User’s Linux terminal session activities
+There are some business critical Linux servers where we want keep track on all users activity, so this can be accomplished using script command, place the following content in /etc/profile file ,
+
+[root@ ~]# vi /etc/profile
+……………………………………………………
+if [ "x$SESSION_RECORD" = "x" ]
+then
+timestamp=$(date +%d-%m-%Y-%T)
+session_log=/var/log/session/session.$USER.$$.$timestamp
+SESSION_RECORD=started
+export SESSION_RECORD
+script -t -f -q 2>${session_log}.timing $session_log
+exit
+fi
+……………………………………………………
+Save & exit the file.
+
+Create the session directory under /var/log folder,
+
+[root@linuxtechi ~]# mkdir /var/log/session
+Assign the permissions to session folder,
+
+[root@ ~]# chmod 777 /var/log/session/
+[root@ ~]#
+
+
+test "$(ps -ocommand= -p $PPID | awk '{print $1}')" == 'script' || (script -f $HOME/$(date +"%d-%b-%y_%H-%M-%S")_shell.log)
+, change script -f to script -F:
+
+
+test "$(ps -ocommand= -p $PPID | awk '{print $1}')" == 'script' || (script -t -f -q 2>${session_log}.timing $session_log)
+, change script -f to script -F:
+
+
