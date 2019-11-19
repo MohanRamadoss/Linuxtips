@@ -1,0 +1,56 @@
+{
+  "variables": {
+    "name": "centos7-packer",
+    "release": "v1.0.0",
+    "aws_subnet_id": "",
+  "aws_vpc_id": "",
+  "date_time": "{{timestamp}}",
+    "source_ami": "ami-03f500d272dc8f7e4",
+    "access_key":"",
+    "secret_key":"",
+    "region":"ap-southeast-1",
+    "ssh_username": "centos",
+    "ssh_private_key_file": "./mohanaws.pem",
+    "os": "Linux",
+    "os_version": "redhat"
+
+  },
+  "builders": [{
+    "type": "amazon-ebs",
+    "access_key": "{{user `access_key`}}",
+    "secret_key":"{{user `secret_key`}}",
+    "ami_name": "Centos7-v{{user `release`}}-{{user `date_time`}}",
+    "region": "{{user `region`}}",
+    "source_ami": "{{user `source_ami`}}",
+    "instance_type": "t2.micro",
+    "communicator": "ssh",
+    "ssh_username": "centos",
+    "ssh_private_key_file": "./mohanaws.pem",
+    "associate_public_ip_address": true,
+    "run_tags":{
+        "Name":"testpacker-image",
+        "OS": "{{user `os`}}",
+    "OS_Version": "{{user `os_version`}}",
+    "Release": "{{user `release`}}",
+    "Base_AMI_Name": "{{ .SourceAMIName }}",
+    "Purpose": "{{user `purpose`}}",
+    "Builder": "Packer {{packer_version}}"
+
+      }
+  }],
+  "provisioners": [
+      {
+          "type": "shell",
+          "inline": "sudo yum install wget -y ; sudo yum install -y epel-release ; cd /tmp ; sudo yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm ; sudo systemctl start amazon-ssm-agent "
+
+      },
+
+      
+      {
+        "type":"shell",
+        "script":"bootstrap.sh",
+        "execute_command": "echo 'centos'|sudo -S sh '{{.Path}}'"
+      }
+
+    ]
+}
